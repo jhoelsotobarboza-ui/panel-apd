@@ -1,0 +1,101 @@
+﻿<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel Ejecutivo de Fiscalizacion APD</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }
+        .card-kpi { border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        .bar-vigente { background-color: #198754; color: white; }
+        .bar-revocada { background-color: #bb2d3b; color: white; }
+    </style>
+</head>
+<body class="py-4">
+    <div class="container">
+        <div class="mb-4">
+            <span class="text-uppercase text-danger fw-bold small">01 . UNIVERSO DE SALAS</span>
+            <h2 id="titulo-universo" class="fw-bold text-dark">Cargando datos del SIC...</h2>
+            <p class="text-muted small">Segun SIC Consultas; una sala por codigo de autorizacion.</p>
+        </div>
+
+        <!-- Tarjetas KPI -->
+        <div class="row g-3 mb-4">
+            <div class="col-md-3">
+                <div class="card card-kpi p-3 border-start border-4 border-dark">
+                    <h3 id="kpi-total" class="fw-bold mb-1">0</h3>
+                    <span class="text-muted small">Total de salas</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-kpi p-3 border-start border-4 border-success">
+                    <h3 id="kpi-vigentes" class="fw-bold mb-1 text-success">0</h3>
+                    <span id="txt-vigentes" class="text-muted small">Vigentes</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-kpi p-3 border-start border-4 border-warning">
+                    <h3 id="kpi-suspendidas" class="fw-bold mb-1 text-warning">0</h3>
+                    <span id="txt-suspendidas" class="text-muted small">Suspendidas</span>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="card card-kpi p-3 border-start border-4 border-danger">
+                    <h3 id="kpi-revocadas" class="fw-bold mb-1 text-danger">0</h3>
+                    <span id="txt-revocadas" class="text-muted small">Revocadas</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barra de Porcentajes -->
+        <div class="card card-kpi p-3 mb-4">
+            <div class="progress" style="height: 35px; border-radius: 6px;">
+                <div id="bar-vig-pct" class="progress-bar bar-vigente fw-bold fs-6" role="progressbar" style="width: 0%">0%</div>
+                <div id="bar-rev-pct" class="progress-bar bar-revocada fw-bold fs-6" role="progressbar" style="width: 0%">0%</div>
+            </div>
+            <div class="d-flex justify-content-between mt-3 px-2">
+                <div><span class="badge bg-success rounded-circle p-2 me-1"></span> <strong id="leyenda-vig">Vigentes: 0 (0%)</strong></div>
+                <div><span class="badge bg-warning rounded-circle p-2 me-1"></span> <strong id="leyenda-susp">Suspendidas: 0 (0%)</strong></div>
+                <div><span class="badge bg-danger rounded-circle p-2 me-1"></span> <strong id="leyenda-rev">Revocadas: 0 (0%)</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function cargarResumen() {
+            try {
+                let response = await fetch("/api/resumen");
+                let data = await response.json();
+                
+                document.getElementById("titulo-universo").innerText = `${data.total_salas.toLocaleString()} salas registradas; ${data.porcentaje_vigentes}% estan vigentes`;
+                document.getElementById("kpi-total").innerText = data.total_salas.toLocaleString();
+                document.getElementById("kpi-vigentes").innerText = data.vigentes.toLocaleString();
+                document.getElementById("txt-vigentes").innerText = `Vigentes - ${data.porcentaje_vigentes}%`;
+                
+                document.getElementById("kpi-suspendidas").innerText = data.suspendidas.toLocaleString();
+                document.getElementById("txt-suspendidas" ).innerText = `Suspendidas - ${data.porcentaje_suspendidas}%`;
+                
+                document.getElementById("kpi-revocadas").innerText = data.revocadas.toLocaleString();
+                document.getElementById("txt-revocadas").innerText = `Revocadas - ${data.porcentaje_revocadas}%`;
+
+                // Barras y leyendas
+                document.getElementById("bar-vig-pct").style.width = data.porcentaje_vigentes + "%";
+                document.getElementById("bar-vig-pct").innerText = data.porcentaje_vigentes + "%";
+                
+                let pctRevocadas = (100 - data.porcentaje_vigentes).toFixed(1);
+                document.getElementById("bar-rev-pct").style.width = pctRevocadas + "%";
+                document.getElementById("bar-rev-pct").innerText = pctRevocadas + "%";
+
+                document.getElementById("leyenda-vig").innerText = `Vigentes: ${data.vigentes} (${data.porcentaje_vigentes}%)`;
+                document.getElementById("leyenda-susp").innerText = `Suspendidas: ${data.suspendidas} (${data.porcentaje_suspendidas}%)`;
+                document.getElementById("leyenda-rev").innerText = `Revocadas: ${data.revocadas} (${data.porcentaje_revocadas}%)`;
+            } catch (error) {
+                console.error("Error al cargar datos:", error);
+            }
+        }
+        cargarResumen();
+    </script>
+</body>
+</html>
+

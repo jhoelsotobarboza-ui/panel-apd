@@ -1,9 +1,11 @@
 ﻿from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import os
 
-app = FastAPI(title="API Gateway - Fiscalizacion APD MINCETUR", version="1.0")
+app = FastAPI(title="Panel Fiscalizacion APD", version="1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -12,6 +14,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Montar archivos estáticos para la interfaz web
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 DATA_PATH = os.path.join(os.path.dirname(__file__), "data/sic_export.json")
 
@@ -27,9 +33,13 @@ def get_sic_data():
         {"codigo": "A003", "estado": "SUSPENDIDA", "departamento": "LA LIBERTAD", "provincia": "TRUJILLO", "distrito": "TRUJILLO", "nombre": "Sala Ejemplo 3"},
     ])
 
-@app.get("/")
+@app.get("/", response_class=HTMLResponse)
 def root():
-    return {"status": "Online", "message": "API Gateway de Fiscalizacion APD operando correctamente"}
+    html_path = os.path.join("static", "index.html")
+    if os.path.exists(html_path):
+        with open(html_path, "r", encoding="utf-8") as f:
+            return f.read()
+    return "<h3>Panel operativo encendido. Falta index.html en /static</h3>"
 
 @app.get("/api/resumen")
 def get_resumen_salas():
