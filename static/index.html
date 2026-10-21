@@ -4,98 +4,75 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Panel Ejecutivo de Fiscalizacion APD</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }
-        .card-kpi { border: none; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
-        .bar-vigente { background-color: #198754; color: white; }
-        .bar-revocada { background-color: #bb2d3b; color: white; }
+        :root { --bg: #f2f4f8; --ink: #14213d; --mu: #56627a; --ln: #dde2ea; --f: #2457a7; --c: #b4232a; --a: #c98a0b; }
+        @media (prefers-color-scheme: dark) { :root { --bg: #0e1524; --ink: #e9edf5; --mu: #9eabc2; --ln: #2c3957; --f: #7aa5f2; --c: #ef7f85; --a: #f0b34a; } }
+        html, body { margin: 0; background: var(--bg); color: var(--ink); font-family: "Segoe UI", Roboto, Arial, sans-serif; }
+        .sync { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+                padding: 8px 22px; font-size: 12.5px; color: var(--mu); border-bottom: 1px solid var(--ln); }
+        .sync b { color: var(--ink); }
+        .sync .warn { color: var(--a); }
+        .sync .err { color: var(--c); }
+        .sync a { color: var(--f); }
+        @media print { .sync { display: none; } }
     </style>
 </head>
-<body class="py-4">
-    <div class="container">
-        <div class="mb-4">
-            <span class="text-uppercase text-danger fw-bold small">01 . UNIVERSO DE SALAS</span>
-            <h2 id="titulo-universo" class="fw-bold text-dark">Cargando datos del SIC...</h2>
-            <p class="text-muted small">Segun SIC Consultas; una sala por codigo de autorizacion.</p>
-        </div>
-
-        <!-- Tarjetas KPI -->
-        <div class="row g-3 mb-4">
-            <div class="col-md-3">
-                <div class="card card-kpi p-3 border-start border-4 border-dark">
-                    <h3 id="kpi-total" class="fw-bold mb-1">0</h3>
-                    <span class="text-muted small">Total de salas</span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-kpi p-3 border-start border-4 border-success">
-                    <h3 id="kpi-vigentes" class="fw-bold mb-1 text-success">0</h3>
-                    <span id="txt-vigentes" class="text-muted small">Vigentes</span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-kpi p-3 border-start border-4 border-warning">
-                    <h3 id="kpi-suspendidas" class="fw-bold mb-1 text-warning">0</h3>
-                    <span id="txt-suspendidas" class="text-muted small">Suspendidas</span>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="card card-kpi p-3 border-start border-4 border-danger">
-                    <h3 id="kpi-revocadas" class="fw-bold mb-1 text-danger">0</h3>
-                    <span id="txt-revocadas" class="text-muted small">Revocadas</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Barra de Porcentajes -->
-        <div class="card card-kpi p-3 mb-4">
-            <div class="progress" style="height: 35px; border-radius: 6px;">
-                <div id="bar-vig-pct" class="progress-bar bar-vigente fw-bold fs-6" role="progressbar" style="width: 0%">0%</div>
-                <div id="bar-rev-pct" class="progress-bar bar-revocada fw-bold fs-6" role="progressbar" style="width: 0%">0%</div>
-            </div>
-            <div class="d-flex justify-content-between mt-3 px-2">
-                <div><span class="badge bg-success rounded-circle p-2 me-1"></span> <strong id="leyenda-vig">Vigentes: 0 (0%)</strong></div>
-                <div><span class="badge bg-warning rounded-circle p-2 me-1"></span> <strong id="leyenda-susp">Suspendidas: 0 (0%)</strong></div>
-                <div><span class="badge bg-danger rounded-circle p-2 me-1"></span> <strong id="leyenda-rev">Revocadas: 0 (0%)</strong></div>
-            </div>
-        </div>
-    </div>
+<body>
+    <div class="sync"><span id="sync-txt">Consultando la ultima actualizacion…</span><a href="/logout">Salir</a></div>
+    <div id="dash"></div>
 
     <script>
-        async function cargarResumen() {
-            try {
-                let response = await fetch("/api/resumen");
-                let data = await response.json();
-                
-                document.getElementById("titulo-universo").innerText = `${data.total_salas.toLocaleString()} salas registradas; ${data.porcentaje_vigentes}% estan vigentes`;
-                document.getElementById("kpi-total").innerText = data.total_salas.toLocaleString();
-                document.getElementById("kpi-vigentes").innerText = data.vigentes.toLocaleString();
-                document.getElementById("txt-vigentes").innerText = `Vigentes - ${data.porcentaje_vigentes}%`;
-                
-                document.getElementById("kpi-suspendidas").innerText = data.suspendidas.toLocaleString();
-                document.getElementById("txt-suspendidas" ).innerText = `Suspendidas - ${data.porcentaje_suspendidas}%`;
-                
-                document.getElementById("kpi-revocadas").innerText = data.revocadas.toLocaleString();
-                document.getElementById("txt-revocadas").innerText = `Revocadas - ${data.porcentaje_revocadas}%`;
+        // El dashboard (dashboard.js) es el mismo que se usa en dgjcmt-apd.com. Aqui pide /api/... a este
+        // servidor, que responde con la copia enviada por la extension "Puente SIC - Panel APD".
+        try { localStorage.setItem("token", "panel"); } catch (e) {}
 
-                // Barras y leyendas
-                document.getElementById("bar-vig-pct").style.width = data.porcentaje_vigentes + "%";
-                document.getElementById("bar-vig-pct").innerText = data.porcentaje_vigentes + "%";
-                
-                let pctRevocadas = (100 - data.porcentaje_vigentes).toFixed(1);
-                document.getElementById("bar-rev-pct").style.width = pctRevocadas + "%";
-                document.getElementById("bar-rev-pct").innerText = pctRevocadas + "%";
-
-                document.getElementById("leyenda-vig").innerText = `Vigentes: ${data.vigentes} (${data.porcentaje_vigentes}%)`;
-                document.getElementById("leyenda-susp").innerText = `Suspendidas: ${data.suspendidas} (${data.porcentaje_suspendidas}%)`;
-                document.getElementById("leyenda-rev").innerText = `Revocadas: ${data.revocadas} (${data.porcentaje_revocadas}%)`;
-            } catch (error) {
-                console.error("Error al cargar datos:", error);
-            }
+        function fecha(iso) {
+            if (!iso) return "—";
+            var d = new Date(iso);
+            return d.toLocaleDateString("es-PE") + " " + d.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
         }
-        cargarResumen();
+
+        fetch("/api/estado", { cache: "no-store" }).then(function (r) {
+            if (r.status === 401) { location.href = "/login"; throw new Error("sesion"); }
+            return r.json();
+        }).then(function (s) {
+            var el = document.getElementById("sync-txt");
+            if (!s.datos) {
+                el.innerHTML = '<span class="err">Todavia no se recibieron datos.</span> Abra Chrome con la extension «Puente SIC – Panel APD» y con sesion iniciada en dgjcmt-apd.com y SIC Consultas.';
+                return;
+            }
+            // Los envios son a las 8:00 y 17:00; si pasan mas de 16 horas, se avisa que las cifras son de un envio anterior.
+            var cifras = [s.api_at, s.sic_ok ? s.sic_at : null].filter(Boolean).sort()[0] || s.recibido;
+            var horas = (Date.now() - new Date(cifras).getTime()) / 3600000;
+            var html = "Cifras al <b>" + fecha(cifras) + "</b> · Sistema: " + fecha(s.api_at) + " · SIC: " + (s.sic_ok ? fecha(s.sic_at) : '<span class="err">sin Excel</span>');
+            if (horas > 16) html = '<span class="warn">' + html + " (hace " + Math.round(horas) + " h; se muestran las ultimas cifras guardadas)</span>";
+            html += " · Ultimo envio: " + fecha(s.recibido);
+            if (s.sic_error) html += ' <span class="warn">(ultimo intento de SIC fallo; se muestra el Excel anterior)</span>';
+            el.innerHTML = html;
+        }).catch(function () {});
+
+        // Puente SIC: el dashboard pide el Excel con postMessage(SIC_EXT_REQ), como si estuviera la extension.
+        document.documentElement.setAttribute("data-sic-bridge", "1");
+        window.addEventListener("message", function (ev) {
+            var d = ev.data;
+            if (ev.source !== window || !d || d.type !== "SIC_EXT_REQ") return;
+            var id = String(d.id || "");
+            var send = function (o) { window.postMessage(Object.assign({ type: "SIC_EXT_RES", id: id }, o), location.origin); };
+            fetch("/api/sic", { cache: "no-store" }).then(function (r) {
+                if (r.status === 401) throw new Error("La sesion del panel vencio; vuelva a ingresar.");
+                return r.json();
+            }).then(function (res) {
+                if (!res.ok) return send({ ok: false, error: "panel", message: res.message || "sin datos de SIC" });
+                var bin = atob(res.b64), u = new Uint8Array(bin.length);
+                for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+                send({ ok: true, buf: u.buffer, at: res.at, susp: res.susp || null });
+            }).catch(function (e) {
+                send({ ok: false, error: "panel", message: String(e.message || e) });
+            });
+        });
+
+        window.__DASH_MOUNT = document.getElementById("dash");
     </script>
+    <script src="/static/dashboard.js"></script>
 </body>
 </html>
-
