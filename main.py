@@ -1,9 +1,9 @@
-from fastapi import FastAPI
+ï»¿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import os
 
-app = FastAPI(title="API Gateway - Fiscalización APD MINCETUR", version="1.0")
+app = FastAPI(title="API Gateway - Fiscalizacion APD MINCETUR", version="1.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -29,7 +29,7 @@ def get_sic_data():
 
 @app.get("/")
 def root():
-    return {"status": "Online", "message": "API Gateway de Fiscalización APD operando correctamente"}
+    return {"status": "Online", "message": "API Gateway de Fiscalizacion APD operando correctamente"}
 
 @app.get("/api/resumen")
 def get_resumen_salas():
