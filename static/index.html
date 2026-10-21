@@ -34,11 +34,13 @@
 
         fetch("/api/estado", { cache: "no-store" }).then(function (r) {
             if (r.status === 401) { location.href = "/login"; throw new Error("sesion"); }
+            if (!r.ok) throw new Error("El servidor del panel respondio con error HTTP " + r.status + ".");
             return r.json();
         }).then(function (s) {
             var el = document.getElementById("sync-txt");
+            var base = s.error_base ? ' <span class="err">· Falla la base de datos (DATABASE_URL): ' + esc(s.error_base) + "</span>" : "";
             if (!s.datos) {
-                el.innerHTML = '<span class="err">Todavia no se recibieron datos.</span> Abra Chrome con la extension «Puente SIC – Panel APD» y con sesion iniciada en dgjcmt-apd.com y SIC Consultas.';
+                el.innerHTML = '<span class="err">Todavia no se recibieron datos.</span> Abra el icono de la extension «Puente SIC – Panel APD» y pulse «Enviar ahora» (con sesion iniciada en dgjcmt-apd.com y SIC Consultas).' + base;
                 return;
             }
             // Los envios son a las 8:00 y 17:00; si pasan mas de 16 horas, se avisa que las cifras son de un envio anterior.
@@ -48,8 +50,14 @@
             if (horas > 16) html = '<span class="warn">' + html + " (hace " + Math.round(horas) + " h; se muestran las ultimas cifras guardadas)</span>";
             html += " · Ultimo envio: " + fecha(s.recibido);
             if (s.sic_error) html += ' <span class="warn">(ultimo intento de SIC fallo; se muestra el Excel anterior)</span>';
-            el.innerHTML = html;
-        }).catch(function () {});
+            el.innerHTML = html + base;
+        }).catch(function (e) {
+            if (e.message !== "sesion") document.getElementById("sync-txt").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
+        });
+
+        function esc(t) {
+            return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+        }
 
         // Puente SIC: el dashboard pide el Excel con postMessage(SIC_EXT_REQ), como si estuviera la extension.
         document.documentElement.setAttribute("data-sic-bridge", "1");
@@ -74,5 +82,16 @@
         window.__DASH_MOUNT = document.getElementById("dash");
     </script>
     <script src="/static/dashboard.js"></script>
+    <script>
+        // En el panel los datos llegan de la extension: se quitan de la barra superior
+        // «Traer de SIC Consultas» y «Cargar Excel de salas» (siguen disponibles en el aviso central).
+        (function () {
+            var root = document.getElementById("dash").shadowRoot;
+            if (!root) return;
+            var st = document.createElement("style");
+            st.textContent = ".acts #sic, .acts #ux { display: none !important; }";
+            root.appendChild(st);
+        })();
+    </script>
 </body>
 </html>

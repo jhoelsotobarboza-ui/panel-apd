@@ -1,4 +1,4 @@
-﻿"""Panel Fiscalizacion APD.
+"""Panel Fiscalizacion APD.
 
 La extension "Puente SIC - Panel APD" envia a las 8:00 y 17:00 (POST /api/ingest) una
 copia de los datos que usa el dashboard de dgjcmt-apd.com: las respuestas de su API
@@ -33,7 +33,15 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 DATA_DIR = os.environ.get("DATA_DIR") or os.path.join(BASE_DIR, "data")
 SNAPSHOT_PATH = os.path.join(DATA_DIR, "snapshot.json.gz")
-DATABASE_URL = os.environ.get("DATABASE_URL", "")
+def _clean_db_url(raw: str) -> str:
+    # Tolera lo que suele pegarse desde Neon/Render: "psql 'postgresql://...'", comillas o "DATABASE_URL=".
+    url = raw.strip()
+    url = re.sub(r"^(DATABASE_URL\s*=\s*)", "", url)
+    url = re.sub(r"^psql\s+", "", url)
+    return url.strip().strip("'\"").strip()
+
+
+DATABASE_URL = _clean_db_url(os.environ.get("DATABASE_URL", ""))
 
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "")
 INGEST_KEY = os.environ.get("INGEST_KEY", "")
@@ -51,13 +59,22 @@ app = FastAPI(title="Panel Fiscalizacion APD", version="2.0", docs_url=None, red
 # ---------- Copia de datos enviada por la extension ----------
 
 _cache = {"version": None, "data": None, "checked": 0.0}
+# Ultimo error de la base de datos (se muestra en la barra del panel). Si la base falla, se usa el disco.
+_db_error = {"msg": None}
 
 
 def _db():
     import psycopg  # solo se usa si hay DATABASE_URL
-    conn = psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=15)
+    conn = psycopg.connect(DATABASE_URL, autocommit=True, connect_timeout=8)
     conn.execute("CREATE TABLE IF NOT EXISTS panel_snapshot (id INT PRIMARY KEY, version TEXT NOT NULL, data BYTEA NOT NULL)")
     return conn
+
+
+def _db_failed(exc: Exception):
+    msg = (type(exc).__name__ + ": " + str(exc)).replace(DATABASE_URL, "<DATABASE_URL>") if DATABASE_URL else str(exc)
+    msg = re.sub(r"://[^@\s]*@", "://***@", msg)[:300]
+    _db_error["msg"] = msg
+    print("[panel-apd] Error con DATABASE_URL, se usa el disco:", msg, flush=True)
 
 
 def api_key(path_and_query: str) -> str:
@@ -69,20 +86,7 @@ def api_key(path_and_query: str) -> str:
     return path + ("?" + query if query else "")
 
 
-def load_snapshot():
-    """Ultima copia recibida. Se conserva hasta que llegue otra, aunque pasen dias sin envios."""
-    if DATABASE_URL:
-        # Se revisa la version en la base como maximo cada 30 s; el contenido solo se baja si cambio.
-        if _cache["data"] is not None and time.time() - _cache["checked"] < 30:
-            return _cache["data"]
-        with _db() as conn:
-            row = conn.execute("SELECT version FROM panel_snapshot WHERE id = 1").fetchone()
-            if row and row[0] != _cache["version"]:
-                blob = conn.execute("SELECT data FROM panel_snapshot WHERE id = 1").fetchone()[0]
-                _cache["data"] = json.loads(gzip.decompress(bytes(blob)))
-                _cache["version"] = row[0]
-        _cache["checked"] = time.time()
-        return _cache["data"]
+def _disk_load():
     try:
         mtime = os.path.getmtime(SNAPSHOT_PATH)
     except OSError:
@@ -94,22 +98,55 @@ def load_snapshot():
     return _cache["data"]
 
 
-def save_snapshot(data: dict):
-    blob = gzip.compress(json.dumps(data, ensure_ascii=False).encode("utf-8"))
-    if DATABASE_URL:
-        with _db() as conn:
-            conn.execute(
-                "INSERT INTO panel_snapshot (id, version, data) VALUES (1, %s, %s) "
-                "ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version, data = EXCLUDED.data",
-                (data["id"], blob),
-            )
-        _cache.update(version=data["id"], data=data, checked=time.time())
-        return
+def _disk_save(blob: bytes):
     os.makedirs(DATA_DIR, exist_ok=True)
     tmp = SNAPSHOT_PATH + ".tmp"
     with open(tmp, "wb") as f:
         f.write(blob)
     os.replace(tmp, SNAPSHOT_PATH)
+
+
+def load_snapshot():
+    """Ultima copia recibida. Se conserva hasta que llegue otra, aunque pasen dias sin envios."""
+    if not DATABASE_URL:
+        return _disk_load()
+    # Se revisa la version en la base como maximo cada 30 s; el contenido solo se baja si cambio.
+    # Tras un fallo tambien se espera 30 s antes de reintentar, para no demorar cada pagina.
+    if time.time() - _cache["checked"] < 30 and (_cache["data"] is not None or _db_error["msg"]):
+        return _cache["data"]
+    try:
+        with _db() as conn:
+            row = conn.execute("SELECT version FROM panel_snapshot WHERE id = 1").fetchone()
+            if row and row[0] != _cache["version"]:
+                blob = conn.execute("SELECT data FROM panel_snapshot WHERE id = 1").fetchone()[0]
+                _cache["data"] = json.loads(gzip.decompress(bytes(blob)))
+                _cache["version"] = row[0]
+        _db_error["msg"] = None
+    except Exception as exc:
+        _db_failed(exc)
+        if _cache["data"] is None:
+            _disk_load()
+    _cache["checked"] = time.time()
+    return _cache["data"]
+
+
+def save_snapshot(data: dict):
+    blob = gzip.compress(json.dumps(data, ensure_ascii=False).encode("utf-8"))
+    if DATABASE_URL:
+        try:
+            with _db() as conn:
+                conn.execute(
+                    "INSERT INTO panel_snapshot (id, version, data) VALUES (1, %s, %s) "
+                    "ON CONFLICT (id) DO UPDATE SET version = EXCLUDED.version, data = EXCLUDED.data",
+                    (data["id"], blob),
+                )
+            _db_error["msg"] = None
+            _cache.update(version=data["id"], data=data, checked=time.time())
+            return
+        except Exception as exc:
+            _db_failed(exc)
+    _disk_save(blob)
+    _cache.update(version=os.path.getmtime(SNAPSHOT_PATH), data=data, checked=time.time())
 
 
 # ---------- Sesion ----------
@@ -209,10 +246,11 @@ def estado(request: Request):
         raise HTTPException(401)
     snap = load_snapshot()
     if not snap:
-        return {"datos": False}
+        return {"datos": False, "error_base": _db_error["msg"]}
     sic = snap.get("sic") or {}
     return {
         "datos": True,
+        "error_base": _db_error["msg"],
         "recibido": snap.get("received"),
         "api_at": snap.get("api_at"),
         "sic_at": sic.get("at"),
