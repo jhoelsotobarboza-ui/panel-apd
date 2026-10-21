@@ -41,7 +41,11 @@ def _clean_db_url(raw: str) -> str:
     return url.strip().strip("'\"").strip()
 
 
-DATABASE_URL = _clean_db_url(os.environ.get("DATABASE_URL", ""))
+_DB_RAW = _clean_db_url(os.environ.get("DATABASE_URL", ""))
+_m = re.search(r"postgres(?:ql)?://\S+", _DB_RAW)
+# Solo se usa si es una direccion de Postgres; cualquier otro valor se ignora (se usa el disco) y se avisa.
+DATABASE_URL = _m.group(0).rstrip("'\"") if _m else ""
+DATABASE_URL_INVALIDA = bool(_DB_RAW) and not DATABASE_URL
 
 PANEL_PASSWORD = os.environ.get("PANEL_PASSWORD", "")
 INGEST_KEY = os.environ.get("INGEST_KEY", "")
@@ -61,6 +65,9 @@ app = FastAPI(title="Panel Fiscalizacion APD", version="2.0", docs_url=None, red
 _cache = {"version": None, "data": None, "checked": 0.0}
 # Ultimo error de la base de datos (se muestra en la barra del panel). Si la base falla, se usa el disco.
 _db_error = {"msg": None}
+if DATABASE_URL_INVALIDA:
+    _db_error["msg"] = ("DATABASE_URL no es una direccion de Postgres (debe empezar con postgresql://); "
+                        "se ignora y se guarda en disco, que Render borra al reiniciar.")
 
 
 def _db():
@@ -245,10 +252,11 @@ def estado(request: Request):
     if not has_session(request):
         raise HTTPException(401)
     snap = load_snapshot()
-    if not snap:
-        return {"datos": False, "error_base": _db_error["msg"]}
-    sic = snap.get("sic") or {}
+    sic = (snap or {}).get("sic") or {}
+    if not snap or not (snap.get("api") or sic.get("b64")):
+        return {"datos": False, "error_base": _db_error["msg"], "intento": (snap or {}).get("ultimo_intento")}
     return {
+        "intento": snap.get("ultimo_intento"),
         "datos": True,
         "error_base": _db_error["msg"],
         "recibido": snap.get("received"),
@@ -314,6 +322,17 @@ async def ingest(request: Request):
 
     old = load_snapshot() or {}
     sic_in = payload.get("sic") or {}
+    now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    errors = [str(e)[:300] for e in (payload.get("errors") or [])][:20]
+    intento = {"at": now, "errores": errors, "nuevo": bool(api or sic_in.get("b64"))}
+
+    if not intento["nuevo"]:
+        # La extension no consiguio datos nuevos: solo se registra el intento y se conservan las cifras guardadas.
+        snap = dict(old) if old else {"api": {}, "sic": {}}
+        snap.update(ultimo_intento=intento, id=secrets.token_hex(6))
+        save_snapshot(snap)
+        return {"ok": True, "respuestas": len(snap.get("api") or {}), "sic": bool((snap.get("sic") or {}).get("b64"))}
+
     if sic_in.get("b64"):
         base64.b64decode(sic_in["b64"], validate=True)
         sic_data = {"b64": sic_in["b64"], "at": sic_in.get("at"), "susp": sic_in.get("susp")}
@@ -327,11 +346,12 @@ async def ingest(request: Request):
         api = old["api"]
 
     snap = {
-        "received": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "received": now,
         "api_at": payload.get("api_at") if payload.get("api") else old.get("api_at"),
         "api": api,
         "sic": sic_data,
-        "errors": [str(e)[:300] for e in (payload.get("errors") or [])][:20],
+        "errors": errors,
+        "ultimo_intento": intento,
         "id": secrets.token_hex(6),
     }
     save_snapshot(snap)

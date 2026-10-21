@@ -39,8 +39,14 @@
         }).then(function (s) {
             var el = document.getElementById("sync-txt");
             var base = s.error_base ? ' <span class="err">· Falla la base de datos (DATABASE_URL): ' + esc(s.error_base) + "</span>" : "";
+            // Ultimo intento de la extension que no trajo datos nuevos: se muestra el motivo que informo.
+            var it = s.intento && !s.intento.nuevo ? s.intento : null;
+            var intento = it ? ' <span class="err">· Intento de la extension el ' + fecha(it.at) + " sin datos nuevos: " +
+                esc((it.errores || []).join(" · ") || "sin detalle") + "</span>" : "";
             if (!s.datos) {
-                el.innerHTML = '<span class="err">Todavia no se recibieron datos.</span> Abra el icono de la extension «Puente SIC – Panel APD» y pulse «Enviar ahora» (con sesion iniciada en dgjcmt-apd.com y SIC Consultas).' + base;
+                el.innerHTML = '<span class="err">Todavia no se recibieron datos.</span> ' +
+                    (it ? "" : "La extension «Puente SIC – Panel APD» aun no se ha comunicado con el panel: recarguela en chrome://extensions, pegue la clave de envio en su icono y pulse «Enviar ahora».") +
+                    intento + base;
                 return;
             }
             // Los envios son a las 8:00 y 17:00; si pasan mas de 16 horas, se avisa que las cifras son de un envio anterior.
@@ -50,7 +56,7 @@
             if (horas > 16) html = '<span class="warn">' + html + " (hace " + Math.round(horas) + " h; se muestran las ultimas cifras guardadas)</span>";
             html += " · Ultimo envio: " + fecha(s.recibido);
             if (s.sic_error) html += ' <span class="warn">(ultimo intento de SIC fallo; se muestra el Excel anterior)</span>';
-            el.innerHTML = html + base;
+            el.innerHTML = html + intento + base;
         }).catch(function (e) {
             if (e.message !== "sesion") document.getElementById("sync-txt").innerHTML = '<span class="err">' + esc(e.message) + "</span>";
         });
