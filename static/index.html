@@ -90,12 +90,16 @@
     <script src="/static/dashboard.js"></script>
     <script>
         // En el panel los datos llegan de la extension: se quitan de la barra superior
-        // «Traer de SIC Consultas» y «Cargar Excel de salas» (siguen disponibles en el aviso central).
+        // «Traer de SIC Consultas» y «Cargar Excel de salas» (siguen disponibles en el aviso central),
+        // el aviso «Salas actualizadas desde SIC Consultas…» (los errores de SIC si se muestran) y la
+        // tarjeta de Año / Ordenar / Cambiar Excel / Quitar con las columnas del Excel.
         (function () {
             var root = document.getElementById("dash").shadowRoot;
             if (!root) return;
             var st = document.createElement("style");
-            st.textContent = ".acts #sic, .acts #ux { display: none !important; }";
+            st.textContent = ".acts #sic, .acts #ux { display: none !important; }" +
+                "#sicmsg .note:not(.err) { display: none !important; }" +
+                "#xdash > .pn:has(#xy) { display: none !important; }";
             root.appendChild(st);
         })();
     </script>
