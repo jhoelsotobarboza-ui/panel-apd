@@ -37,10 +37,10 @@
     function pct(a, n) { return n ? (a / n * 100).toFixed(1) + " %" : "—"; }
     function titulo(t) { return String(t).toLowerCase().replace(/(^|\s)(\S)/g, function (z, p, q) { return p + q.toUpperCase(); }).replace(/ (De|Del|La|Las|Los|Y) /g, function (z) { return z.toLowerCase(); }); }
 
-    // Color por cobertura (salas atendidas / salas autorizadas), tipo semaforo: un color distinto por tramo
-    // para que provincias vecinas de tramos distintos se diferencien a simple vista.
-    var CERO = "#c62828";
-    var TRAMOS = [[0.2, "#ef6c00"], [0.4, "#f9a825"], [0.6, "#c0ca33"], [0.8, "#66bb6a"], [1.01, "#1b7a3e"]];
+    // Color por cobertura (salas atendidas / salas autorizadas): escala sobria de calido (pendiente) a frio
+    // (avanzado), con tonos apagados acordes al azul marino del panel y distinguibles por personas daltonicas.
+    var CERO = "#9e3b3b";
+    var TRAMOS = [[0.2, "#c98a6b"], [0.4, "#e3cfa8"], [0.6, "#b4c6d8"], [0.8, "#5f86ad"], [1.01, "#22426b"]];
     function relleno(q) {
         if (!q || !q.n) return "fill:var(--ln)";
         if (!q.a) return "fill:" + CERO;
