@@ -234,14 +234,14 @@ def root(request: Request):
 
 @app.get("/static/{name}.js")
 def static_js(name: str, request: Request):
-    # dashboard.js, los mapas (mapas.js) y sus trazos (geo.js); los trazos se pueden guardar en cache.
+    # dashboard.js, los mapas (mapas.js) y sus trazos (geo.js).
     if name not in ("dashboard", "mapas", "geo"):
         raise HTTPException(404)
     if not has_session(request):
         raise HTTPException(401)
-    cache = "private, max-age=86400" if name == "geo" else "no-store"
+    # no-cache: el navegador puede guardarlos pero los revalida en cada carga, asi nunca usa una version vieja.
     return FileResponse(os.path.join(STATIC_DIR, name + ".js"), media_type="application/javascript",
-                        headers={"Cache-Control": cache})
+                        headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/healthz")
