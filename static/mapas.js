@@ -123,10 +123,12 @@
             enMapa[k] = 1;
             if (sel === k) selG = g;
             var tip = titulo(g.n) + (q && q.n ? ": " + num(q.a) + " de " + num(q.n) + " salas atendidas (" + pct(q.a, q.n) + ")" : ": sin salas");
-            return '<path d="' + g.d + '" data-mp="' + esc(k) + '" style="' + relleno(q) + ";stroke-width:" + (0.8 * esc1).toFixed(2) +
-                '" tabindex="0" role="button" aria-label="' + esc(tip) + '"><title>' + esc(tip) + "</title></path>";
+            // Al pasar el mouse la zona se agranda: las pequeñas mas, hasta verse de ~9 % del ancho del mapa.
+            var lado = Math.max(g.b[2] - g.b[0], g.b[3] - g.b[1], 0.1), zs = Math.min(8, Math.max(1.12, vb[2] * 0.09 / lado));
+            return '<path d="' + g.d + '" data-mp="' + esc(k) + '" style="' + relleno(q) + ";--mp-s:" + zs.toFixed(2) +
+                '" tabindex="0" role="button" aria-label="' + esc(tip) + '"></path>';
         });
-        if (selG) paths.push('<path d="' + selG.d + '" class="mp-borde" style="stroke-width:' + (2.6 * esc1).toFixed(2) + '" aria-hidden="true"></path>');
+        if (selG) paths.push('<path d="' + selG.d + '" class="mp-borde" aria-hidden="true"></path>');
         // Etiquetas: las 5 con mas salas atendidas y la seleccionada.
         var etq = orden.slice(0, 5);
         if (sel && etq.indexOf(sel) < 0 && ix[sel]) etq.push(sel);
@@ -165,7 +167,7 @@
 
         return '<div class="mp" data-mp-tipo="' + tipo + '">' + kpis +
             '<div class="mp-g"><div class="mp-mapa"><div class="mp-top"><h4>' + t.titulo + "</h4>" + botones + "</div>" + leyenda +
-            '<div class="mp-svg"><svg viewBox="' + vb.map(function (v) { return v.toFixed(1); }).join(" ") + '" role="group" aria-label="Mapa: ' + t.titulo + '">' +
+            '<div class="mp-svg"><div class="mp-tip" aria-hidden="true"></div><svg viewBox="' + vb.map(function (v) { return v.toFixed(1); }).join(" ") + '" role="group" aria-label="Mapa: ' + t.titulo + '">' +
             paths.join("") + labels + "</svg></div>" +
             '<p class="mp-nota">Haga clic en una ' + t.una + " para ver su detalle." +
             (fuera.length ? " No se ubicaron en el mapa: " + fuera.map(function (k) { return esc(ix[k].label) + " (" + num(ix[k].n) + ")"; }).join(", ") + "." : "") + "</p></div>" +
@@ -187,11 +189,15 @@
         ".mp-ley{display:flex;flex-wrap:wrap;align-items:center;gap:4px 12px;font-size:12px;color:var(--mu);margin:0 0 8px}" +
         ".mp-ley .mp-lt{font-weight:700;color:var(--ink)}" +
         ".mp-ley i{display:inline-block;width:12px;height:12px;border-radius:2px;margin-right:5px;vertical-align:-2px}" +
-        ".mp-svg{border:1px solid var(--ln);border-radius:10px;background:var(--panel);padding:8px}" +
+        ".mp-svg{position:relative;border:1px solid var(--ln);border-radius:10px;background:var(--panel);padding:8px}" +
+        ".mp-tip{position:absolute;z-index:2;pointer-events:none;display:none;background:var(--ink);color:var(--panel);font-size:12.5px;line-height:1.35;padding:6px 10px;border-radius:6px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.25)}" +
+        ".mp-tip b{display:block;font-size:13.5px}" +
         ".mp-svg svg{display:block;width:100%;height:auto;max-height:680px}" +
-        ".mp-svg path{stroke:var(--panel);stroke-linejoin:round;cursor:pointer;outline:none}" +
-        ".mp-svg path:hover,.mp-svg path:focus-visible{stroke:var(--ink)}" +
-        ".mp-svg path.mp-borde{fill:none!important;stroke:var(--ink);pointer-events:none}" +
+        ".mp-svg path{stroke:var(--panel);stroke-width:.8px;vector-effect:non-scaling-stroke;stroke-linejoin:round;cursor:pointer;outline:none;" +
+        "transform-box:fill-box;transform-origin:center;transition:transform .15s ease}" +
+        ".mp-svg path:focus-visible{stroke:var(--ink);stroke-width:2px}" +
+        ".mp-svg path.mp-hov{transform:scale(var(--mp-s));stroke:var(--ink);stroke-width:2px;filter:drop-shadow(0 3px 6px rgba(0,0,0,.35))}" +
+        ".mp-svg path.mp-borde{fill:none!important;stroke:var(--ink);stroke-width:2.6px;pointer-events:none}" +
         ".mp-lbl{pointer-events:none}.mp-lbl circle{fill:var(--ink);stroke:var(--panel)}" +
         ".mp-lbl text{fill:var(--ink);font-weight:700;paint-order:stroke;stroke:var(--panel);stroke-linejoin:round}" +
         ".mp-lbl .mp-lv{font-weight:600;fill:var(--mu)}" +
@@ -240,6 +246,35 @@
             redibujar(box, tipo, ev.type === "keydown" ? 'path[data-mp="' + k.replace(/"/g, '\\"') + '"]' : "");
         };
         root.addEventListener("click", accion);
+        // Zona bajo el mouse: se pasa al frente (en SVG manda el orden), se agranda y se muestra su resumen.
+        var hov = null;
+        var soltar = function () {
+            if (!hov) return;
+            hov.classList.remove("mp-hov");
+            var tp = hov.closest(".mp-svg"); tp = tp && tp.querySelector(".mp-tip"); if (tp) tp.style.display = "none";
+            hov = null;
+        };
+        root.addEventListener("pointerover", function (ev) {
+            var p = ev.target.closest && ev.target.closest("path[data-mp]");
+            if (p === hov) return;
+            soltar();
+            if (!p) return;
+            hov = p;
+            p.parentNode.appendChild(p);
+            p.classList.add("mp-hov");
+        });
+        root.addEventListener("pointermove", function (ev) {
+            if (!hov) return;
+            var box = hov.closest(".mp-svg"), tp = box && box.querySelector(".mp-tip");
+            if (!tp) return;
+            var txt = hov.getAttribute("aria-label") || "", i = txt.indexOf(": ");
+            tp.innerHTML = "<b>" + esc(i > 0 ? txt.slice(0, i) : txt) + "</b>" + esc(i > 0 ? txt.slice(i + 2) : "");
+            tp.style.display = "block";
+            var r = box.getBoundingClientRect(), x = ev.clientX - r.left + 14, y = ev.clientY - r.top + 14;
+            if (x + tp.offsetWidth > r.width - 4) x = ev.clientX - r.left - tp.offsetWidth - 14;
+            tp.style.left = x + "px"; tp.style.top = y + "px";
+        });
+        root.addEventListener("pointerleave", soltar, true);
         root.addEventListener("keydown", function (ev) {
             if ((ev.key === "Enter" || ev.key === " ") && ev.target.matches && ev.target.matches("path[data-mp]")) { ev.preventDefault(); accion(ev); }
         });
