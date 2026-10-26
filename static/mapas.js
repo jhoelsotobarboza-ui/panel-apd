@@ -244,7 +244,7 @@
     }
 
     window.__MAPA_APD = function (tipo, filas, anio) {
-        if (!TXT[tipo] || !window.__GEO_APD) return "";
+        if (!TXT[tipo] || !window.__GEO_APD || window.__GEO_APD.v !== 2) return "";
         ultimo[tipo] = { filas: filas || [], anio: anio };
         // Por defecto se muestra la mas fiscalizada (la primera por salas atendidas).
         if (!elegido[tipo]) {
@@ -253,6 +253,7 @@
             if (top) elegido[tipo] = clave(top.label);
         }
         setTimeout(enganchar, 0);
-        return dibujar(tipo);
+        // Si el mapa falla (p. ej. un geo.js viejo), se devuelve "" y la tarjeta vuelve a las barras sin romper el panel.
+        try { return dibujar(tipo); } catch (e) { console.error("[mapas]", e); return ""; }
     };
 })();
