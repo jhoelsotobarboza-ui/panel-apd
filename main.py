@@ -232,12 +232,16 @@ def root(request: Request):
     return FileResponse(os.path.join(STATIC_DIR, "index.html"), headers={"Cache-Control": "no-store"})
 
 
-@app.get("/static/dashboard.js")
-def dashboard_js(request: Request):
+@app.get("/static/{name}.js")
+def static_js(name: str, request: Request):
+    # dashboard.js, los mapas (mapas.js) y sus trazos (geo.js); los trazos se pueden guardar en cache.
+    if name not in ("dashboard", "mapas", "geo"):
+        raise HTTPException(404)
     if not has_session(request):
         raise HTTPException(401)
-    return FileResponse(os.path.join(STATIC_DIR, "dashboard.js"), media_type="application/javascript",
-                        headers={"Cache-Control": "no-store"})
+    cache = "private, max-age=86400" if name == "geo" else "no-store"
+    return FileResponse(os.path.join(STATIC_DIR, name + ".js"), media_type="application/javascript",
+                        headers={"Cache-Control": cache})
 
 
 @app.get("/healthz")
