@@ -37,14 +37,16 @@
     function pct(a, n) { return n ? (a / n * 100).toFixed(1) + " %" : "—"; }
     function titulo(t) { return String(t).toLowerCase().replace(/(^|\s)(\S)/g, function (z, p, q) { return p + q.toUpperCase(); }).replace(/ (De|Del|La|Las|Los|Y) /g, function (z) { return z.toLowerCase(); }); }
 
-    // Color por cobertura (salas atendidas / salas autorizadas).
-    var TRAMOS = [[0.2, .22], [0.4, .4], [0.6, .58], [0.8, .78], [1.01, 1]];
+    // Color por cobertura (salas atendidas / salas autorizadas), tipo semaforo: un color distinto por tramo
+    // para que provincias vecinas de tramos distintos se diferencien a simple vista.
+    var CERO = "#c62828";
+    var TRAMOS = [[0.2, "#ef6c00"], [0.4, "#f9a825"], [0.6, "#c0ca33"], [0.8, "#66bb6a"], [1.01, "#1b7a3e"]];
     function relleno(q) {
         if (!q || !q.n) return "fill:var(--ln)";
-        if (!q.a) return "fill:var(--c);fill-opacity:.38";
-        var p = q.a / q.n, op = 1;
-        for (var i = 0; i < TRAMOS.length; i++) if (p < TRAMOS[i][0]) { op = TRAMOS[i][1]; break; }
-        return "fill:var(--f);fill-opacity:" + op;
+        if (!q.a) return "fill:" + CERO;
+        var p = q.a / q.n, col = TRAMOS[TRAMOS.length - 1][1];
+        for (var i = 0; i < TRAMOS.length; i++) if (p < TRAMOS[i][0]) { col = TRAMOS[i][1]; break; }
+        return "fill:" + col;
     }
 
     function indice(filas) {
@@ -146,10 +148,10 @@
 
         var fuera = Object.keys(ix).filter(function (k) { return !enMapa[k]; });
         var leyenda = '<div class="mp-ley"><span class="mp-lt">Cobertura</span>' +
-            '<span><i style="background:var(--c);opacity:.38"></i>0 %</span>' +
+            '<span><i style="background:' + CERO + '"></i>0 %</span>' +
             TRAMOS.map(function (tr, i) {
                 var de = i ? TRAMOS[i - 1][0] * 100 : 0, a = Math.min(tr[0], 1) * 100;
-                return '<span><i style="background:var(--f);opacity:' + tr[1] + '"></i>' + (de || "1") + "–" + a + " %</span>";
+                return '<span><i style="background:' + tr[1] + '"></i>' + (de || "1") + "–" + a + " %</span>";
             }).join("") + '<span><i style="background:var(--ln)"></i>Sin salas</span></div>';
         var botones = tipo === "lima" ? '<div class="mp-zoom" role="group" aria-label="Encuadre">' +
             '<button data-mp-zoom="urb" class="' + (zoom.lima === "urb" ? "on" : "") + '">Lima urbana</button>' +
