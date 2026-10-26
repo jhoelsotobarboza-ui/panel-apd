@@ -25,7 +25,9 @@
 
     function clave(t) {
         var s = String(t || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase()
-            .replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim();
+            .replace(/[^A-Z0-9 ]+/g, " ").replace(/\s+/g, " ").trim()
+            // «PROV. CONST. DEL CALLAO», «PROVINCIA CONSTITUCIONAL DEL CALLAO», «PROVINCIA DE ...»
+            .replace(/^PROV(INCIA)? CONST(ITUCIONAL)? DEL? /, "").replace(/^PROVINCIA DE /, "");
         return ALIAS[s] || s;
     }
     function esc(t) {
