@@ -169,7 +169,7 @@
             '<div class="mp-g"><div class="mp-mapa"><div class="mp-top"><h4>' + t.titulo + "</h4>" + botones + "</div>" + leyenda +
             '<div class="mp-svg"><div class="mp-tip" aria-hidden="true"></div><svg viewBox="' + vb.map(function (v) { return v.toFixed(1); }).join(" ") + '" role="group" aria-label="Mapa: ' + t.titulo + '">' +
             paths.join("") + labels + "</svg></div>" +
-            '<p class="mp-nota">Haga clic en una ' + t.una + " para ver su detalle." +
+            '<p class="mp-nota"><span class="mp-hint">Haga clic en una ' + t.una + " para ver su detalle.</span>" +
             (fuera.length ? " No se ubicaron en el mapa: " + fuera.map(function (k) { return esc(ix[k].label) + " (" + num(ix[k].n) + ")"; }).join(", ") + "." : "") + "</p></div>" +
             '<div class="mp-lado"><div class="mp-info" aria-live="polite">' + ficha(tipo, sel, ix, G, u.anio, puestos) + "</div>" + prio + "</div></div></div>";
     }
@@ -215,10 +215,14 @@
         ".mp-sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:7px}" +
         ".mp-bar{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--ln);margin:0 0 6px}.mp-bar i{display:block;height:100%}" +
         ".mp-prio{border:1px solid var(--ln);border-top:4px solid var(--c);border-radius:10px;background:var(--panel);padding:4px 18px 12px}" +
-        ".mp-prio button{display:flex;justify-content:space-between;width:100%;gap:10px;border:0;border-bottom:1px solid var(--ln);background:none;color:var(--ink);font-size:13.5px;padding:6px 0;text-align:left}" +
+        ".mp-prio button{font:inherit;display:flex;justify-content:space-between;width:100%;gap:10px;border:0;border-bottom:1px solid var(--ln);background:none;color:var(--ink);font-size:13.5px;padding:6px 0;text-align:left}" +
         ".mp-prio button:hover,.mp-prio button.on{color:var(--c)}.mp-prio b{font-variant-numeric:tabular-nums;white-space:nowrap}" +
         ".mp-nota{font-size:12.5px;color:var(--mu);margin:10px 0 0}" +
-        "@media print{.mp-zoom,.mp-prio{display:none}.mp-lado{position:static}}";
+        "@media print{.mp-zoom,.mp-tip,.mp-hint{display:none!important}.mp-lado{position:static}" +
+        ".mp-g{grid-template-columns:minmax(0,1.35fr) minmax(250px,1fr);gap:16px;break-inside:avoid}.mp-kpi{break-inside:avoid;margin-bottom:12px}" +
+        ".mp-kpi b{font-size:22px}.mp-svg svg{max-height:108mm}.mp-svg path.mp-hov{transform:none;filter:none;stroke:var(--panel);stroke-width:.8px}" +
+        ".mp{break-inside:avoid}.mp-info,.mp-prio{break-inside:avoid}.mp-info{padding:10px 14px}.mp-lado{gap:8px}.mp-nom{font-size:17px}" +
+        ".mp-tri{margin:6px 0 2px}.mp-tri b{font-size:16px}.mp-sec{margin:8px 0 3px}.mp-row{font-size:12px;padding:2px 0}.mp-prio{padding:2px 14px 8px}.mp-prio button{padding:2px 0;font-size:12px}}";
 
     function enganchar() {
         if (enganchado) return;
